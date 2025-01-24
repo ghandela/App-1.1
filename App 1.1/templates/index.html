@@ -1,0 +1,159 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Magic: The Gathering Banlist</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 90%;
+            max-width: 400px;
+        }
+        table {
+            width: 90%;
+            max-width: 400px;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+        button {
+            padding: 10px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #edit-mode {
+            display: none;
+            width: 90%;
+            max-width: 400px;
+        }
+    </style>
+    <script>
+        if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.register("/static/service-worker.js");
+        }
+
+        async function fetchBanlist() {
+            console.log("fetchBanlist() called");
+            const response = await fetch('/api/banlist');
+            const data = await response.json();
+            const tableBody = document.getElementById('banlist-table-body');
+            tableBody.innerHTML = '';
+            data.forEach(card => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${card.card_name}</td>
+                    <td>${card.reason}</td>
+                    <td>${card.added_by}</td>
+                    <td>
+                        <button onclick="deleteCard(${card.id})">Delete</button>
+                        <button onclick="editCard(${card.id}, '${card.card_name}', '${card.reason}', '${card.added_by}')">Edit</button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        async function addCard() {
+            const cardName = document.getElementById('card-name').value;
+            const reason = document.getElementById('reason').value;
+            const addedBy = document.getElementById('added-by').value;
+
+            await fetch('/api/banlist', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ card_name: cardName, reason: reason, added_by: addedBy })
+            });
+
+            fetchBanlist();
+        }
+
+        async function deleteCard(cardId) {
+            await fetch(`/api/banlist/${cardId}`, { method: 'DELETE' });
+            fetchBanlist();
+        }
+
+        function editCard(cardId, cardName, reason, addedBy) {
+            document.getElementById('card-id').value = cardId;
+            document.getElementById('card-name').value = cardName;
+            document.getElementById('reason').value = reason;
+            document.getElementById('added-by').value = addedBy;
+            document.getElementById('edit-mode').style.display = 'block';
+        }
+
+        async function updateCard() {
+            const cardId = document.getElementById('card-id').value;
+            const cardName = document.getElementById('card-name').value;
+            const reason = document.getElementById('reason').value;
+            const addedBy = document.getElementById('added-by').value;
+
+            await fetch(`/api/banlist/${cardId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ card_name: cardName, reason: reason, added_by: addedBy })
+            });
+
+            document.getElementById('edit-mode').style.display = 'none';
+            fetchBanlist();
+        }
+
+        window.onload = fetchBanlist;
+    </script>
+</head>
+<body>
+    <h1>Magic: The Gathering Banlist</h1>
+
+    <form onsubmit="event.preventDefault(); addCard();">
+        <input type="text" id="card-name" placeholder="Card Name" required>
+        <input type="text" id="reason" placeholder="Reason">
+        <input type="text" id="added-by" placeholder="Added By">
+        <button type="submit">Add Card</button>
+    </form>
+
+    <div id="edit-mode">
+        <h2>Edit Card</h2>
+        <input type="hidden" id="card-id">
+        <input type="text" id="card-name" placeholder="Card Name" required>
+        <input type="text" id="reason" placeholder="Reason">
+        <input type="text" id="added-by" placeholder="Added By">
+        <button onclick="updateCard()">Update Card</button>
+    </div>
+
+    <h2>Banlist</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Card Name</th>
+                <th>Reason</th>
+                <th>Added By</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="banlist-table-body"></tbody>
+    </table>
+</body>
+</html>
